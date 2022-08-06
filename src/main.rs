@@ -26,46 +26,23 @@ mod plumming {
 
     pub mod cat {
         use super::*;
-        use flate2::Decompress;
-        use std::str::*;
+        use std::io::prelude::*;
+        use flate2::read::ZlibDecoder;
         // implements the cat-file pretty-print command of git
         // as input it accepts a sha1 String representing the sha of an object stored in the object directory
         // and in outputs to the standard output the content of that object.
-        pub fn pretty_print(sha_object: &String) -> Result<&str, &(dyn std::error::Error + 'static)> {
+        pub fn pretty_print(sha_object: &String) -> std::io::Result<String> {
             // Git stores its obects based on the hash.
             // The first two hex numbers are the directory in which they are stored and the last is the actual name of the file
             // found int he object directory.
             let (dir_name, file_name) = sha_object.split_at(2);
             let full_path = GIT_OBJECTS.to_string() + "/" + dir_name + "/" + file_name;
-            let mut output_data: Vec<u8> = Vec::new();
-            fs::read(full_path).and_then(|file_content| {
-                let mut decompressor = Decompress::new(true);
-                decompressor.decompress_vec(
-                    &file_content,
-                    &mut output_data,
-                    flate2::FlushDecompress::Sync,
-                ).map(|x| { () }).map_err(|e| { e.into() })
-            }).and_then(|_| {
-                std::str::from_utf8(output_data).map_err(|e| {e.into() })
-            }
-            // match fs::read(full_path) {
-            //     Ok(file_content) => {
-            //         let mut decompressor = Decompress::new(true);
-            //         let mut output_data: Vec<u8> = Vec::new();
-            //         match decompressor.decompress_vec(
-            //             &file_content,
-            //             &mut output_data,
-            //             flate2::FlushDecompress::Sync,
-            //         ) {
-            //             Ok(status) => {
-
-            //                 Ok(())
-            //             }
-            //             Err(e) => Err(format!("failed to decompress the object with error status: '{}'", e)),
-            //         }
-            //     }
-            //     Err(e) => Err(format!("command failed with error: '{}'", e)),
-            // }
+            let file_content = fs::read(full_path)?;
+            let mut z = ZlibDecoder::new(&file_content[..]);
+            let mut s = String::new();
+            z.read_to_string(&mut s)?;
+            println!("{}", s);
+            Ok(s)
         }
     }
 
