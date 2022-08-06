@@ -30,8 +30,8 @@ mod plumming {
         use flate2::read::ZlibDecoder;
         // implements the cat-file pretty-print command of git
         // as input it accepts a sha1 String representing the sha of an object stored in the object directory
-        // and in outputs to the standard output the content of that object.
-        pub fn pretty_print(sha_object: &String) -> std::io::Result<String> {
+        // and it returns the content of that object as String.
+        pub fn sha_obect_to_string(sha_object: &String) -> std::io::Result<String> {
             // Git stores its obects based on the hash.
             // The first two hex numbers are the directory in which they are stored and the last is the actual name of the file
             // found int he object directory.
@@ -41,8 +41,15 @@ mod plumming {
             let mut z = ZlibDecoder::new(&file_content[..]);
             let mut s = String::new();
             z.read_to_string(&mut s)?;
-            println!("{}", s);
             Ok(s)
+        }
+
+        // This function takes a `sha` of an object and prints the content of the
+        // file with the same `sha`.
+        pub fn pretty_print(sha_object: &String) -> std::io::Result<()> {
+            let file_content = sha_obect_to_string(sha_object)?;
+            println!("{}", file_content);
+            Ok(())
         }
     }
 
