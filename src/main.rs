@@ -1,11 +1,87 @@
 use std::env;
-use std::fs;
 use std::process;
 
 fn print_usage() {
     println!("usage: codecrafters-git-rust <command>");
     println!("Available commands: ");
     println!("\t [init]: initialize git repository");
+    println!("\t [cat-file]: read a blob of data from the `object` directory.");
+    println!(
+        "\t\t ars: [-p] [sha]: output the content of the object with `sha` to the standard output."
+    );
+}
+
+mod plumming {
+    use std::fs;
+    pub const GIT_OBJECTS: &str = ".git/objects";
+
+    // init a git repository by creating the directory structure found in .git
+    pub fn init() {
+        fs::create_dir(".git").unwrap();
+        fs::create_dir(".git/objects").unwrap();
+        fs::create_dir(".git/refs").unwrap();
+        fs::write(".git/HEAD", "ref: refs/heads/master\n").unwrap();
+        println!("Initialized git directory")
+    }
+
+    pub mod cat {
+        use super::*;
+        use flate2::Decompress;
+        use std::str::*;
+        // implements the cat-file pretty-print command of git
+        // as input it accepts a sha1 String representing the sha of an object stored in the object directory
+        // and in outputs to the standard output the content of that object.
+        pub fn pretty_print(sha_object: &String) -> Result<&str, &(dyn std::error::Error + 'static)> {
+            // Git stores its obects based on the hash.
+            // The first two hex numbers are the directory in which they are stored and the last is the actual name of the file
+            // found int he object directory.
+            let (dir_name, file_name) = sha_object.split_at(2);
+            let full_path = GIT_OBJECTS.to_string() + "/" + dir_name + "/" + file_name;
+            let mut output_data: Vec<u8> = Vec::new();
+            fs::read(full_path).and_then(|file_content| {
+                let mut decompressor = Decompress::new(true);
+                decompressor.decompress_vec(
+                    &file_content,
+                    &mut output_data,
+                    flate2::FlushDecompress::Sync,
+                ).map(|x| { () }).map_err(|e| { e.into() })
+            }).and_then(|_| {
+                std::str::from_utf8(output_data).map_err(|e| {e.into() })
+            }
+            // match fs::read(full_path) {
+            //     Ok(file_content) => {
+            //         let mut decompressor = Decompress::new(true);
+            //         let mut output_data: Vec<u8> = Vec::new();
+            //         match decompressor.decompress_vec(
+            //             &file_content,
+            //             &mut output_data,
+            //             flate2::FlushDecompress::Sync,
+            //         ) {
+            //             Ok(status) => {
+
+            //                 Ok(())
+            //             }
+            //             Err(e) => Err(format!("failed to decompress the object with error status: '{}'", e)),
+            //         }
+            //     }
+            //     Err(e) => Err(format!("command failed with error: '{}'", e)),
+            // }
+        }
+    }
+
+    pub fn cat_file(args: &[String]) -> Result<(), String> {
+        if args[0] == "-p" && args.len() == 2 {
+            match cat::pretty_print(&args[1]) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(format!(
+                    "Error: cat-file -p command failed with error: '{}'",
+                    e
+                )),
+            }
+        } else {
+            Err("Error: args[0] {}, not a valid cat-file command".to_string())
+        }
+    }
 }
 
 fn main() {
@@ -15,11 +91,15 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
         if args[1] == "init" {
-            fs::create_dir(".git").unwrap();
-            fs::create_dir(".git/objects").unwrap();
-            fs::create_dir(".git/refs").unwrap();
-            fs::write(".git/HEAD", "ref: refs/heads/master\n").unwrap();
-            println!("Initialized git directory")
+            plumming::init();
+        } else if args[1] == "cat-file" {
+            match plumming::cat_file(&args[2..]) {
+                Ok(_) => process::exit(0),
+                Err(s) => {
+                    println!("{}", s);
+                    process::exit(-1)
+                }
+            }
         } else {
             println!("unknown command: {}", args[1]);
             print_usage();
