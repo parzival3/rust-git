@@ -26,3 +26,4 @@ flate2 = "1.0"                                                  # gzip compressi
 sha-1 = "0.9.0"
 anyhow = "1.0.59"                                               # error handling
 thiserror = "1.0.32"                                            # error handling
+hex = "0.4.3"
